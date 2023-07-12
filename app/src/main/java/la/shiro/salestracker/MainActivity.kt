@@ -302,7 +302,7 @@ fun ReTrackDevice(isTracked: MutableState<Boolean>, snackBarHostState: SnackbarH
             ),
             modifier = Modifier
                 .fillMaxWidth(1f)
-                .padding(top = 16.dp, start = 16.dp, end = 16.dp),
+                .padding(16.dp),
         ) {
             Column(
                 modifier = Modifier
@@ -375,7 +375,7 @@ fun ReTrackDevice(isTracked: MutableState<Boolean>, snackBarHostState: SnackbarH
                 ),
                 modifier = Modifier
                     .fillMaxWidth(1f)
-                    .padding(top = 16.dp, start = 16.dp, end = 16.dp),
+                    .padding(16.dp),
             ) {
                 Column(
                     modifier = Modifier

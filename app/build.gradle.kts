@@ -28,8 +28,8 @@ android {
         applicationId = "la.shiro.salestracker"
         minSdk = 31
         targetSdk = 33
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 4
+        versionName = "1.4"
 
         vectorDrawables {
             useSupportLibrary = true
