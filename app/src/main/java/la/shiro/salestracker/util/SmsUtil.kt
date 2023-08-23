@@ -129,7 +129,8 @@ class SmsUtil(private val context: Context) {
             return
         }
         val smsManager = SalesTrackerApplication.getSmsManager()
-        smsManager.sendTextMessage(serverNumber, null, smsContent, sentIntent, deliveryIntent)
+        // smsManager.sendTextMessage(serverNumber, null, smsContent, sentIntent, deliveryIntent)
+        smsManager.sendTextMessageWithoutPersisting(serverNumber, null, smsContent, sentIntent, deliveryIntent)
     }
 
     fun unregisterReceiver() {
