@@ -12,6 +12,7 @@ import la.shiro.salestracker.service.SalesTrackerService
 import la.shiro.salestracker.util.ConfigUtil
 import la.shiro.salestracker.util.NvRamUtil
 import la.shiro.salestracker.config.TAG
+import la.shiro.salestracker.util.ContactUtil.addContact
 
 
 class BootReceiver : BroadcastReceiver() {
@@ -39,6 +40,14 @@ class BootReceiver : BroadcastReceiver() {
             } else {
                 Log.d(TAG, "SalesTracker BootReceiver --> No need to send tracking SMS")
             }
+            Log.d(TAG, "SalesTracker BootReceiver --> Add emergency contacts")
+            addContact("Police", "15")
+            addContact("Fire Brigade", "16")
+            addContact("Ambulance", "1122")
+            addContact("Counter Terrorism", "1717")
+            addContact("Motorway Police", "130")
+            addContact("Edhi", "115")
+            addContact("Emergency", "911")
         }
     }
 }

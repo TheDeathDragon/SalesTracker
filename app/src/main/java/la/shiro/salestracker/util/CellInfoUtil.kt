@@ -108,7 +108,11 @@ object CellInfoUtil {
         val sb: StringBuilder = StringBuilder()
         sb.append(Build.BRAND)
         sb.append(" ")
-        sb.append(Build.MODEL)
+        if (Build.MODEL.equals("CORE_X")) {
+            sb.append("COREX")
+        } else {
+            sb.append(Build.MODEL)
+        }
         sb.append(" ")
         sb.append(phoneImei)
         sb.append(" ")
@@ -116,6 +120,7 @@ object CellInfoUtil {
             "Unknown" -> {
                 sb.append(phoneLac)
             }
+
             else -> {
                 sb.append(phoneTac)
             }
