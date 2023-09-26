@@ -41,6 +41,9 @@ class SmsUtil(private val context: Context) {
                 Activity.RESULT_OK -> {
                     Log.d(TAG, "SmsSendReceiver --> RESULT_OK")
                     isSMSSend = true
+                    NvRamUtil.writeNvRamState(true)
+                    Log.d(TAG, "SmsSendReceiver --> stop service")
+                    SalesTrackerService.getInstance().stopSelf()
                 }
 
                 SmsManager.RESULT_ERROR_GENERIC_FAILURE -> {

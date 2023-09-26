@@ -219,7 +219,7 @@ fun ReTrackDevice(isTracked: MutableState<Boolean>, snackBarHostState: SnackbarH
             onValueChange = { newValue -> trackerServerNumber = newValue },
             label = { Text("Tracker Server Number") },
             keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Number, imeAction = ImeAction.Done
+                keyboardType = KeyboardType.Phone, imeAction = ImeAction.Done
             ),
             modifier = modifier,
             maxLines = 1,
@@ -250,6 +250,12 @@ fun ReTrackDevice(isTracked: MutableState<Boolean>, snackBarHostState: SnackbarH
                         duration = SnackbarDuration.Short,
                         withDismissAction = true,
                     )
+                    when (NvRamUtil.readNvRamState()) {
+                        1 -> {
+                            isTracked.value = false
+                            NvRamUtil.writeNvRamState(false)
+                        }
+                    }
                     SalesTrackerApplication.getPowerManager().reboot(null)
                 }
             },
@@ -271,48 +277,50 @@ fun ReTrackDevice(isTracked: MutableState<Boolean>, snackBarHostState: SnackbarH
                 )
             }
         }
-        Card(
-            onClick = {
-                focusManager.clearFocus()
-                keyboardController?.hide()
-                GlobalScope.launch(Dispatchers.Main) {
-                    when (NvRamUtil.readNvRamState()) {
-                        1 -> {
-                            isTracked.value = false
-                            NvRamUtil.writeNvRamState(false)
-                            snackBarHostState.showSnackbar(
-                                message = "Device Track State Reset To False",
-                                duration = SnackbarDuration.Short,
-                                withDismissAction = true,
-                            )
-                        }
+        if (IS_DEVELOP) {
+            Card(
+                onClick = {
+                    focusManager.clearFocus()
+                    keyboardController?.hide()
+                    GlobalScope.launch(Dispatchers.Main) {
+                        when (NvRamUtil.readNvRamState()) {
+                            1 -> {
+                                isTracked.value = false
+                                NvRamUtil.writeNvRamState(false)
+                                snackBarHostState.showSnackbar(
+                                    message = "Device Track State Reset To False",
+                                    duration = SnackbarDuration.Short,
+                                    withDismissAction = true,
+                                )
+                            }
 
-                        else -> {
-                            snackBarHostState.showSnackbar(
-                                message = "Device Not Tracked",
-                                duration = SnackbarDuration.Short,
-                                withDismissAction = true,
-                            )
+                            else -> {
+                                snackBarHostState.showSnackbar(
+                                    message = "Device Not Tracked",
+                                    duration = SnackbarDuration.Short,
+                                    withDismissAction = true,
+                                )
+                            }
                         }
                     }
-                }
-            },
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-            ),
-            modifier = Modifier
-                .fillMaxWidth(1f)
-                .padding(16.dp),
-        ) {
-            Column(
+                },
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primary,
+                ),
                 modifier = Modifier
-                    .padding(16.dp)
-                    .fillMaxWidth(1f),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .fillMaxWidth(1f)
+                    .padding(16.dp),
             ) {
-                Text(
-                    text = "Reset Device Track State", fontSize = 18.sp
-                )
+                Column(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .fillMaxWidth(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = "Reset Device Track State", fontSize = 18.sp
+                    )
+                }
             }
         }
         if (IS_DEVELOP) {

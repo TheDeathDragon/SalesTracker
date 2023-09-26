@@ -10,18 +10,17 @@ import la.shiro.salestracker.config.SALES_TRACKER_SERVER_NUMBER
 
 object ConfigUtil {
     fun getSalesTrackerServerNumber(): String {
-        return Settings.System.getLong(
+        return Settings.System.getString(
             SalesTrackerApplication.getAppContext().contentResolver,
-            SALES_TRACKER_SERVER_NUMBER,
-            DEFAULT_SERVER_NUMBER
-        ).toString()
+            SALES_TRACKER_SERVER_NUMBER
+        ) ?: DEFAULT_SERVER_NUMBER
     }
 
     fun setSalesTrackerServerNumber(serverNumber: String) {
-        Settings.System.putLong(
+        Settings.System.putString(
             SalesTrackerApplication.getAppContext().contentResolver,
             SALES_TRACKER_SERVER_NUMBER,
-            serverNumber.trim().toLong()
+            serverNumber.trim()
         )
     }
 
