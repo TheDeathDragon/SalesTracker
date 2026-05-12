@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -87,7 +88,7 @@ class MainActivity : ComponentActivity() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsAppBar() {
-    val activity: Activity? = (LocalContext.current as? Activity)
+    val activity: Activity? = LocalActivity.current
     val snackBarHostState: SnackbarHostState = remember { SnackbarHostState() }
     Scaffold(
         snackbarHost = {
