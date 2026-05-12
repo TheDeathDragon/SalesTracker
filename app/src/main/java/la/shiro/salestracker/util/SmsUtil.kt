@@ -10,103 +10,56 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.telephony.SmsManager
-import android.telephony.SubscriptionManager
+import android.telephony.SubscriptionInfo
+import android.telephony.TelephonyManager
 import android.util.Log
 import androidx.core.app.ActivityCompat
 import la.shiro.salestracker.SalesTrackerApplication
-import la.shiro.salestracker.service.SalesTrackerService
 import la.shiro.salestracker.config.TAG
 
 @SuppressLint("UnspecifiedRegisterReceiverFlag")
 class SmsUtil(private val context: Context) {
 
     companion object {
-        private const val SMS_SEND_ACTION = "SMS_SENT"
-        private const val SMS_DELIVERY_ACTION = "SMS_DELIVERED"
+        private const val SMS_SEND_ACTION: String = "la.shiro.salestracker.SMS_SENT"
+        private const val SMS_DELIVERY_ACTION: String = "la.shiro.salestracker.SMS_DELIVERED"
+        private const val EXTRA_SLOT_INDEX: String = "slot_index"
+
+        @Volatile
+        private var listener: SmsResultListener? = null
+
+        fun setListener(l: SmsResultListener?) {
+            listener = l
+        }
     }
 
-    private var isSMSSend: Boolean = false
+    interface SmsResultListener {
+        fun onSmsSent(slotIndex: Int)
+        fun onSmsFailed(slotIndex: Int, resultCode: Int)
+        fun onSmsDelivered(slotIndex: Int)
+    }
 
-    private val sentIntent = PendingIntent.getBroadcast(
-        context, 0, Intent(SMS_SEND_ACTION), PendingIntent.FLAG_IMMUTABLE
-    )
-    private val deliveryIntent = PendingIntent.getBroadcast(
-        context, 0, Intent(SMS_DELIVERY_ACTION), PendingIntent.FLAG_IMMUTABLE
-    )
-
-    private val sentReceiver = object : BroadcastReceiver() {
+    private val sentReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            Log.d(TAG, "SmsSendReceiver --> onReceive")
+            val slotIndex: Int = intent?.getIntExtra(EXTRA_SLOT_INDEX, -1) ?: -1
+            Log.d(TAG, "SmsSendReceiver --> onReceive slot=$slotIndex code=$resultCode")
             when (resultCode) {
                 Activity.RESULT_OK -> {
-                    Log.d(TAG, "SmsSendReceiver --> RESULT_OK")
-                    isSMSSend = true
-                    NvRamUtil.writeNvRamState(true)
-                    Log.d(TAG, "SmsSendReceiver --> stop service")
-                    SalesTrackerService.getInstance().stopSelf()
+                    listener?.onSmsSent(slotIndex)
                 }
-
-                SmsManager.RESULT_ERROR_GENERIC_FAILURE -> {
-                    Log.d(TAG, "SmsSendReceiver --> RESULT_ERROR_GENERIC_FAILURE")
-                    if (ActivityCompat.checkSelfPermission(
-                            SalesTrackerApplication.getAppContext(),
-                            Manifest.permission.READ_PHONE_STATE
-                        ) != PackageManager.PERMISSION_GRANTED
-                    ) {
-                        Log.d(TAG, "SmsSendReceiver --> No permission")
-                        isSMSSend = false
-                        return
-                    }
-                    val subInfoList =
-                        SalesTrackerApplication.getSubscriptionManager().activeSubscriptionInfoList
-                    Log.d(TAG, "SmsSendReceiver --> subInfoList: $subInfoList")
-                    if (subInfoList != null && subInfoList.isNotEmpty()) {
-                        setDefaultSmsSubId(
-                            SalesTrackerApplication.getAppContext(),
-                            SalesTrackerApplication.getSubscriptionManager()
-                        )
-                        sendTrackingSMS()
-                    }
-                    isSMSSend = false
-                }
-
-                SmsManager.RESULT_ERROR_RADIO_OFF -> {
-                    Log.d(TAG, "SmsSendReceiver --> RESULT_ERROR_RADIO_OFF")
-                    isSMSSend = false
-                }
-
-                SmsManager.RESULT_ERROR_NULL_PDU -> {
-                    Log.d(TAG, "SmsSendReceiver --> RESULT_ERROR_NULL_PDU")
-                    isSMSSend = false
-                }
-
                 else -> {
-                    Log.d(TAG, "SmsSendReceiver --> RESULT_ERROR_NO_SERVICE")
-                    isSMSSend = false
+                    listener?.onSmsFailed(slotIndex, resultCode)
                 }
             }
         }
     }
 
-    private val deliveryReceiver = object : BroadcastReceiver() {
+    private val deliveryReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            Log.d(TAG, "SmsDeliverReceiver --> onReceive")
-            when (resultCode) {
-                Activity.RESULT_OK -> {
-                    Log.d(TAG, "SmsDeliverReceiver --> RESULT_OK")
-                    if (isSMSSend) {
-                        NvRamUtil.writeNvRamState(true)
-                        Log.d(TAG, "SmsDeliverReceiver --> RESULT_OK and isSMSSend is true")
-                        Log.d(TAG, "SmsDeliverReceiver --> stop service")
-                        SalesTrackerService.getInstance().stopSelf()
-                    } else {
-                        Log.d(TAG, "SmsDeliverReceiver --> RESULT_OK but isSMSSend is false")
-                    }
-                }
-
-                else -> {
-                    Log.d(TAG, "SmsDeliverReceiver --> RESULT_NOT_OK")
-                }
+            val slotIndex: Int = intent?.getIntExtra(EXTRA_SLOT_INDEX, -1) ?: -1
+            Log.d(TAG, "SmsDeliverReceiver --> onReceive slot=$slotIndex code=$resultCode")
+            if (resultCode == Activity.RESULT_OK) {
+                listener?.onSmsDelivered(slotIndex)
             }
         }
     }
@@ -116,48 +69,65 @@ class SmsUtil(private val context: Context) {
         context.registerReceiver(deliveryReceiver, IntentFilter(SMS_DELIVERY_ACTION))
     }
 
-    fun sendTrackingSMS() {
-        val messageSubId = SubscriptionManager.getDefaultSmsSubscriptionId()
-
-        if (messageSubId == SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
-            setDefaultSmsSubId(context, SalesTrackerApplication.getSubscriptionManager())
+    fun sendOnSlot(slotIndex: Int): Boolean {
+        if (!hasSendPermission()) {
+            Log.d(TAG, "sendOnSlot --> No SEND_SMS permission")
+            return false
         }
-        val serverNumber = ConfigUtil.getSalesTrackerServerNumber()
-        val smsContent = CellInfoUtil.getTrackingSMSContent()
-        if (ActivityCompat.checkSelfPermission(
-                context, Manifest.permission.READ_PHONE_STATE
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            Log.d(TAG, "sendTrackingSMS --> No permission")
-            return
+        val telephonyManager: TelephonyManager = SalesTrackerApplication.getTelephonyManager()
+        if (telephonyManager.getSimState(slotIndex) != TelephonyManager.SIM_STATE_READY) {
+            Log.d(TAG, "sendOnSlot --> SIM slot $slotIndex not ready")
+            return false
         }
-        val smsManager = SalesTrackerApplication.getSmsManager()
-        // smsManager.sendTextMessage(serverNumber, null, smsContent, sentIntent, deliveryIntent)
-        smsManager.sendTextMessageWithoutPersisting(serverNumber, null, smsContent, sentIntent, deliveryIntent)
+        val subInfo: SubscriptionInfo? = CellInfoUtil.getActiveSubscriptions().firstOrNull {
+            it.simSlotIndex == slotIndex
+        }
+        if (subInfo == null) {
+            Log.d(TAG, "sendOnSlot --> No SubscriptionInfo for slot $slotIndex")
+            return false
+        }
+        val serverNumber: String = CellInfoUtil.resolveServerNumberForSlot(slotIndex)
+        val smsContent: String = CellInfoUtil.buildTrackingSmsContent()
+        Log.d(TAG, "sendOnSlot --> slot=$slotIndex to=$serverNumber content=$smsContent")
+        val sentIntent: PendingIntent = PendingIntent.getBroadcast(
+            context,
+            slotIndex,
+            Intent(SMS_SEND_ACTION).putExtra(EXTRA_SLOT_INDEX, slotIndex),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val deliveryIntent: PendingIntent = PendingIntent.getBroadcast(
+            context,
+            slotIndex + 100,
+            Intent(SMS_DELIVERY_ACTION).putExtra(EXTRA_SLOT_INDEX, slotIndex),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return try {
+            val baseSmsManager: SmsManager =
+                context.getSystemService(SmsManager::class.java) as SmsManager
+            val smsManager: SmsManager =
+                baseSmsManager.createForSubscriptionId(subInfo.subscriptionId)
+            smsManager.sendTextMessageWithoutPersisting(
+                serverNumber, null, smsContent, sentIntent, deliveryIntent
+            )
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "sendOnSlot --> Exception: $e")
+            false
+        }
     }
 
     fun unregisterReceiver() {
-        context.unregisterReceiver(sentReceiver)
-        context.unregisterReceiver(deliveryReceiver)
+        try {
+            context.unregisterReceiver(sentReceiver)
+            context.unregisterReceiver(deliveryReceiver)
+        } catch (e: Exception) {
+            Log.e(TAG, "unregisterReceiver --> Exception: $e")
+        }
     }
 
-    private fun setDefaultSmsSubId(context: Context, subscriptionManager: SubscriptionManager) {
-        if (ActivityCompat.checkSelfPermission(
-                context, Manifest.permission.READ_PHONE_STATE
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            Log.d(TAG, "sendTrackingSMS --> No permission")
-            return
-        }
-        val subInfoList = subscriptionManager.activeSubscriptionInfoList
-        Log.d(TAG, "sendTrackingSMS --> subInfoList: $subInfoList")
-        if (subInfoList != null && subInfoList.isNotEmpty()) {
-            val subInfo = subInfoList[0]
-            if (subInfo != null) {
-                val subId = subInfo.subscriptionId
-                subscriptionManager.setDefaultSmsSubId(subId)
-                Log.d(TAG, "sendTrackingSMS --> Set default SMS subId: $subId")
-            }
-        }
+    private fun hasSendPermission(): Boolean {
+        return ActivityCompat.checkSelfPermission(
+            context, Manifest.permission.SEND_SMS
+        ) == PackageManager.PERMISSION_GRANTED
     }
 }
