@@ -1,0 +1,31 @@
+android_app_import {
+    name: "SalesTracker",
+    apk: "SalesTracker.apk",
+    privileged: true,
+    system_ext_specific: true,
+    certificate: "platform",
+    dex_preopt: {
+        enabled: true,
+    },
+    presigned: false,
+    required: [
+        "privapp_whitelist_la.shiro.salestracker",
+        "default-permissions-la.shiro.salestracker",
+    ],
+}
+
+prebuilt_etc {
+    name: "privapp_whitelist_la.shiro.salestracker",
+    sub_dir: "permissions",
+    src: "privapp_whitelist_permissions.xml",
+    system_ext_specific: true,
+    filename_from_src: true,
+}
+
+prebuilt_etc {
+    name: "default-permissions-la.shiro.salestracker",
+    sub_dir: "default-permissions",
+    src: "default-permissions.xml",
+    system_ext_specific: true,
+    filename_from_src: true,
+}

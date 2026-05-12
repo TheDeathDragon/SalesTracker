@@ -1,13 +1,37 @@
 import com.android.build.gradle.internal.api.ApkVariantOutputImpl
+import java.text.SimpleDateFormat
+import java.util.Date
 
 plugins {
-    id("com.android.application")
-    id("org.jetbrains.kotlin.android")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.lsplugin.resopt)
 }
+
+val branch: String = "NOTEAIR"
+val projectName: String = "SalesTracker"
+val apkFileName: String = "$projectName.apk"
+val currentBuildTime: String = SimpleDateFormat("yy/MM/dd HH:mm:ss").format(Date())
+val currentVersionDate: Int = SimpleDateFormat("yyMMdd").format(Date()).toInt()
+val currentVersion: String = SimpleDateFormat("yy.MM.dd").format(Date())
+val dateFormat: SimpleDateFormat = SimpleDateFormat("yyyyMMdd_HHmmss")
+val date: String = dateFormat.format(Date())
 
 android {
     namespace = "la.shiro.salestracker"
-    compileSdk = 33
+    compileSdk = 36
+
+    defaultConfig {
+        applicationId = "la.shiro.salestracker"
+        minSdk = 31
+        targetSdk = 36
+        versionCode = currentVersionDate
+        versionName = currentVersion
+        buildConfigField("long", "VERSION_CODE", "$currentVersionDate")
+        buildConfigField("String", "BUILD_TIME", "\"$currentBuildTime\"")
+        buildConfigField("String", "APP_NAME", "\"$projectName\"")
+    }
 
     signingConfigs {
         getByName("debug") {
@@ -24,18 +48,6 @@ android {
         }
     }
 
-    defaultConfig {
-        applicationId = "la.shiro.salestracker"
-        minSdk = 31
-        targetSdk = 33
-        versionCode = 4
-        versionName = "1.4"
-
-        vectorDrawables {
-            useSupportLibrary = true
-        }
-    }
-
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -44,49 +56,97 @@ android {
             )
             signingConfig = signingConfigs.getByName("release")
             isDebuggable = false
+            isShrinkResources = true
         }
         debug {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             signingConfig = signingConfigs.getByName("debug")
             isDebuggable = true
+            isShrinkResources = false
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "1.8"
+
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+        }
     }
+
     buildFeatures {
+        buildConfig = true
         compose = true
-    }
-    composeOptions {
-        kotlinCompilerExtensionVersion = "1.4.3"
     }
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
     applicationVariants.all {
         outputs.all {
             if (this is ApkVariantOutputImpl) {
-                outputFileName = "SalesTracker.apk"
+                outputFileName = apkFileName
             }
         }
     }
 }
 
+allprojects {
+    gradle.projectsEvaluated {
+        tasks.register<Zip>("zipReleaseApkAndAssets") {
+            val apkFile: java.io.File = file("release/$apkFileName")
+            val outputDir: java.io.File = file("dist")
+            if (!outputDir.exists()) {
+                outputDir.mkdirs()
+            }
+            from(apkFile) {
+                into(projectName)
+            }
+            from("etc") {
+                into(projectName)
+            }
+            archiveFileName.set("${projectName}_${branch}_${date}.zip")
+            destinationDirectory.set(outputDir)
+            doLast {
+                println("ZIP file created at: ${outputDir.absolutePath}/${archiveFileName.get()}")
+            }
+        }
+        tasks.register<Zip>("zipDebugSymbols") {
+            val mappingFile: java.io.File = file("build/outputs/mapping/release/mapping.txt")
+            val outputDir: java.io.File = file("dist")
+            if (!outputDir.exists()) {
+                outputDir.mkdirs()
+            }
+            from(mappingFile) {
+                into("DebugSymbols")
+            }
+            archiveFileName.set("${projectName}_${branch}_${date}_Symbols.zip")
+            destinationDirectory.set(outputDir)
+            doLast {
+                println("Symbols file created at: ${outputDir.absolutePath}/${archiveFileName.get()}")
+            }
+        }
+        tasks.getByName("assembleRelease").finalizedBy("zipReleaseApkAndAssets")
+        tasks.getByName("zipReleaseApkAndAssets").finalizedBy("zipDebugSymbols")
+    }
+}
+
 dependencies {
-    implementation("androidx.core:core-ktx:1.10.1")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.6.1")
-    implementation("androidx.activity:activity-compose:1.7.2")
-    implementation(platform("androidx.compose:compose-bom:2023.03.00"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3")
-    implementation(files("/libs/nvram.jar"))
-    compileOnly(files("/libs/framework.jar"))
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.androidx.compose.bom))
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.ui.graphics)
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.material3)
+    implementation(libs.androidx.material.icons.extended)
+    implementation(files("libs/nvram.jar"))
+    compileOnly(files("libs/framework.jar"))
 }
